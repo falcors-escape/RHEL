@@ -1,0 +1,11 @@
+1) create a script that: 
+a) checks how many drives are discovered on the system
+b) checks the drive capacity
+c) checks the free/unallocated space on the drive
+d) checks filesystem/storage type
+e) checks the available space on the storage type
+f) creates new usuable space from the potentially unavailable disk space
+g) If its LVM adds free space to existing partition
+h) adds free space to exiting volume group on the existing partition
+
+DONE
