@@ -1,56 +1,71 @@
 Basic storage tools and their use (automated via bash)
 
-1) parted: To view unallocated space with the (print free) option 
-2) lsblk: Shows attached disks 
-3) awk: pattern scanning and text-processing language built into Linux. It reads text line by line, splitting each line into colums (fields) separated by spaces. 
-4) 
+1) parted: To view unallocated space with the (print free) option
+2) lsblk: Shows attached disks and their attributes (like SIZE and TYPE)
+3) awk: Pattern scanning and text-processing language built into Linux. It reads text line by line, splitting each line into columns (fields) separated by spcaes. 
+4) grep: Command line utility for searching text using patterns/regular expressions. 
+5) While read: A safe stream-processing loop used to read piped input line by line. 
 
+### Script Implementation (`storage_capacity.sh`)
 
-Syntax explanation: 
-discover_disks() {
+```bash
+#!/bin/bash
+
+discover_disks(){
     # Extract only root disks (filtering out partitions, loops, etc.)
     local disks
     disks=$(lsblk -d -n -o NAME,TYPE | awk '$2 == "disk" {print $1}')
-    
-    # Count how many disks were found
-    local disk_count
-    disk_count=$(echo "$disks" | wc -w)
-    
-    echo "Total disks discovered: $disk_count"
-    echo "Disk name(s):"
-    
+
+    # Send human info to stderr so it doesn't pollute the pipe
+    echo "[INFO] Scanning disks...." >&2
+
     for disk in $disks; do
-        echo "  - /dev/$disk"
+        echo "/dev/$disk"
     done
 }
 
-# Call the function to test it
-discover_disks
-
-EXPLANATION:
-
-discover_disks(){
-	local disks
-	local disk_count
-Function declaration (discover_disks(){...}
-local: shell builtin that restricts the variable;s scope to this function only. 
-
-disks=$(lsblk -d -n -o NAME,TYPE | awk '$2 == "disk" {print $1}') 
-$(...) Command Substitution, tells Bash to run the command inside the parentheses, capture whatever text it prints out to the screen, and store that output inside the variable (disks)
-lsblk: standard Linux utility that lists information about all available block devices (hard drives, parittions, USBs, loop devices)
-	-d: (deps/disks flag): tells lsblk to list only the parent devices (the physical disks themselves, like sda, or vda) omitting all child partitions like (sda1, sda2)
-	-n: (no headings flag): Suppresses the header row (NAME, etc) at the top of the output so you only get raw data lines. 
-	-o NAME, TYPE (output columns flag): Customizes the colums to dispaly. Instead of showing mount points, sizes, and owners, it outputs only the device name and its block type (e.g., sda disk, sda1 part)
-awk '$2 == "disk" {print $1}': $2 == "disk" Tells awk to look at the second column ($2) of each line (which lsblk popul;ated with the device type, like disk or part) and check if it exactly equals the word "disk"
-{ptins $1}: if the conditino above matches (meaning its a whole disk and not a partition), awk prints only the first column ($1), which is the disk name (e.g., sda or vda)
-
-disk_count=$(echo "$disks" | wc -w)
-echo "$disks": takes the list of disk names stored in the variable (e.g., vda/nvdb). The quotes ("$disk") are important because they preserve the newline character. 
-wc -w: (word count, words flag): counts how many "words" (or separate lines/items separated by whitespace) are piped into it, giving an accurate count of discovered drives. 
-
-for disk in $disks; do
-        echo "  - /dev/$disk"
+get_disk_sizes(){
+    # Read each line piped into this function
+    while read -r disk_path; do
+        lsblk -o SIZE,NAME "$disk_path"
     done
 }
-for disk in $disks; do ... done: A bash loop that iterates through each item in the $disks variable one by one, assigning the current item's name to a temporary variable named disk. 
-/dev/$disk: Uses variable expansion (The $ symbol) to inject the name of the current disk into a standard Linux device path string, turning a raw name like vda into /dev/vda.  
+
+get_free_space(){
+    while read -r disk_path; do
+        echo "[INFO] Checking unallocated space on $disk_path..." >&2
+
+        # Run parted to print free space and filter for lines containing free space
+        sudo parted -s "$disk_path" print free | grep "Free Space"
+    done
+}
+
+# Call function to test pipeline
+discover_disks | get_free_space
+
+
+###################Detailed Code Breakdown#######################
+
+1. discover_disks() & Stream Separation (stdout vs stderr)
+local disks: Restricts the variable scop strictly to this function
+lsblk -d -n -o NAME, TYPE | awk '$2 == "disk" {print $1}' 
+	Captures only whoe disks (omitting child partitions) and prints their device names
+echo "[INFO] Scanning disks..." >&2
+	>&2 redirects this human readable status message to Standard Error
+echo "/dev/$disk"	
+	Outputs clean device paths to Standard output (stdout) creating a pure data stream for downstream pipeline functions. 
+
+2. get_disk_sizes() & Pipe processing
+while read -r disk_path; do ... done
+	Bash loop that reads incoming lines from a pipe one by one, safelty storing each line into the $disk_path variable. 
+lsblk -o SIZE, NAME "$disk_path" 
+	Queries the system specifically for the size and name of each individual disk passed down the pipe. 
+
+3. get_free_space() & parted Partitioning Analysis
+sudo parted -s "$disk_path" print free
+	-s (script mode): runs parted non-interactively without prompting the user for confirmation. 
+print free
+	instructs parted to output the partition table layout along with all the unallocated gaps ("Free Space")
+| grep "Free Space" 
+	Filters the multi-line parted output so that only the exact rows detailing unallocated free space are displayed. 
+

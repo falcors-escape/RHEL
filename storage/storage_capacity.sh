@@ -5,17 +5,30 @@ discover_disks(){
 	local disks
 	disks=$(lsblk -d -n -o NAME,TYPE | awk '$2 == "disk" {print $1}')
 
-	#Count how many disks were found
-	local disk_count
-	disk_count=$(echo "$disks" | wc -w)
-
-	echo "Total disks discovered: $disk_count"
-	echo "Disk name(s):"
+	#Send human info to stderr so it doesn't pollute the pipe
+	echo "[INFO] Scanning disks...." >&2
 
 	for disk in $disks; do
-		echo " - /dev/$disk"
+		echo "/dev/$disk"
+	done
+}
+
+get_disk_sizes(){
+	#Read each line piped into this function
+	while read -r disk_path; do
+		lsblk -o SIZE,NAME "$disk_path"
+	done
+}
+
+
+get_free_space(){
+	while read -r disk_path; do
+		echo "[INFO] Checking unallocated space on $disk_path..." >&2
+
+		#run parted to print free space and filter for lines containing free space"
+		sudo parted -s "$disk_path" print free | grep "Free Space"
 	done
 }
 
 #Call function to test
-discover_disks
+discover_disks | get_free_space
