@@ -1,11 +1,12 @@
 1) create a script that: 
-a) checks how many drives are discovered on the system
-b) checks the drive capacity
-c) checks the free/unallocated space on the drive
-d) checks filesystem/storage type
-e) checks the available space on the storage type
-f) creates new usuable space from the potentially unavailable disk space
+a) checks how many drives are discovered on the system (done)
+b) checks the drive capacity (done)
+c) checks the free/unallocated space on the drive (done)
+d) checks filesystem/storage type (done)
+e) checks the available space on the storage type (done)
+f) creates new usuable space from the potentially unavailable disk space (done)
 g) If its LVM adds free space to existing partition
 h) adds free space to exiting volume group on the existing partition
 
-DONE
+Once this is done and repetable it needs to be refactored to use UUIDs and handle multiple drives. As of now this works well for 1 drive....
+
