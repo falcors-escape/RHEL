@@ -24,9 +24,14 @@ get_disk_sizes(){
 get_free_space(){
 	while read -r disk_path; do
 		echo "[INFO] Checking unallocated space on $disk_path..." >&2
+		sudo bash -c "
+		echo '-----Sizes in MB-----'
+		parted -s '$disk_path' unit MB print free | grep 'Free Space'
 
-		#run parted to print free space and filter for lines containing free space"
-		sudo parted -s "$disk_path" print free | grep "Free Space"
+		echo '-----Sizes in Sectors-----' 
+		parted -s '$disk_path' unit s print free | grep 'Free Space'
+	"
+		echo ""
 	done
 }
 
